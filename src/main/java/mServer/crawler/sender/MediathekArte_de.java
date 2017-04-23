@@ -35,7 +35,6 @@ import mServer.crawler.GetUrl;
 public class MediathekArte_de extends MediathekReader {
 
     public final static String SENDERNAME = Const.ARTE_DE;
-    protected String URL_ARTE = "http://www.arte.tv/papi/tvguide/epg/schedule/D/L3/";
     protected String URL_CONCERT = "http://concert.arte.tv/de/videos/all";
     protected String URL_CONCERT_NOT_CONTAIN = "-STF";
     protected String URL_ARTE_MEDIATHEK_1 = "http://www.arte.tv/guide/de/plus7/videos?day=-";
@@ -310,6 +309,8 @@ public class MediathekArte_de extends MediathekReader {
             time = time.replace("Uhr", "").trim();
             time = time.replace(".", ":");
             time = time.replace("h", ":");
+            time = time.replace("am", "").trim();
+            time = time.replace("pm", "").trim();
             time = time + ":00";
             if (time.length() < 8) {
                 time = '0' + time;
@@ -325,11 +326,19 @@ public class MediathekArte_de extends MediathekReader {
         }
 
         private void getFilm2(String urlWeb, String filmWebsite, String thema, String title, String description, long dauer, String date, String time) {
+            
             final GetUrl getUrl = new GetUrl(getWartenSeiteLaden());
             getUrl.getUri_Utf(getSendername(), urlWeb, seite1, "");
-            String urlHd = seite1.extract("_MP4_SQ_1\",\"quality\":\"SQ\"", "\"url\":\"", "\"").replace("\\", "");
-            String urlNorm = seite1.extract("_MP4_EQ_1\",\"quality\":\"EQ\"", "\"url\":\"", "\"").replace("\\", "");
-            String urlKlein = seite1.extract("_MP4_HQ_1\",\"quality\":\"HQ\"", "\"url\":\"", "\"").replace("\\", "");
+            
+            String urlHd = seite1.extract("_SQ_1\",\"quality\":\"SQ\"", "\"url\":\"", "\"").replace("\\", "");
+            String urlNorm = seite1.extract("_EQ_1\",\"quality\":\"EQ\"", "\"url\":\"", "\"").replace("\\", "");
+            String urlKlein = seite1.extract("_HQ_1\",\"quality\":\"HQ\"", "\"url\":\"", "\"").replace("\\", "");
+
+            // in english mediathek theme is empty sometimes
+            // try to fill it using the detail page
+            if(thema.isEmpty()) {
+                thema = seite1.extract("\"categories\":[{", "\"name\":\"", "\"");
+            }
 
             // https lässt sich noch?? nicht starten
             final String http = "http:";

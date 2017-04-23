@@ -64,6 +64,7 @@ public class FilmeSuchen {
         mediathekListe.add(new MediathekZdf(this, 0));
         mediathekListe.add(new MediathekZdfTivi(this, 0));
         mediathekListe.add(new MediathekArte_de(this, 0));
+        mediathekListe.add(new MediathekArte_en(this, 0));
         mediathekListe.add(new MediathekArte_fr(this, 0));
         mediathekListe.add(new Mediathek3Sat(this, 1));
         mediathekListe.add(new MediathekSwr(this, 0));
