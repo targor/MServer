@@ -42,7 +42,7 @@ public class ZDFSearchPageTask extends RecursiveTask<Collection<VideoDTO>> {
     
     @Override
     protected Collection<VideoDTO> compute() {
-        
+        Thread.currentThread().setName("ZDF Pool Page-SearchTask");
         Collection<VideoDTO> filmList = new ArrayList<>();
         if(!Config.getStop()) {
             Collection<ZDFEntryTask> subTasks = new ArrayList<>();

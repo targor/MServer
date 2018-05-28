@@ -47,14 +47,21 @@ public class BrCrawler extends MediathekReader {
       });
 
       Log.sysLog("BR Film einsortieren fertig");
-    } finally {
+    }
+      catch(Exception exc)
+      {
+          exc.printStackTrace();
+      }
+    finally
+    {
       //explicitely shutdown the pool
-      shutdownAndAwaitTermination(forkJoinPool, 60, TimeUnit.SECONDS);
+      try{shutdownAndAwaitTermination(forkJoinPool, 60, TimeUnit.SECONDS);}catch(Exception exc){exc.printStackTrace();}
+      Log.sysLog("BR fertig");
+
+      meldungThreadUndFertig();
     }
 
-    Log.sysLog("BR fertig");
-
-    meldungThreadUndFertig();
+  
   }
 
   void shutdownAndAwaitTermination(ExecutorService pool, long delay, TimeUnit delayUnit) {

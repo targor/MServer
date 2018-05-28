@@ -27,6 +27,7 @@ import etm.core.configuration.EtmManager;
 import etm.core.monitor.EtmPoint;
 import java.util.Collection;
 import java.util.concurrent.*;
+import java.util.concurrent.ForkJoinPool.ForkJoinWorkerThreadFactory;
 import mServer.crawler.CrawlerTool;
 import mServer.crawler.FilmeSuchen;
 import mServer.crawler.RunSender;
@@ -44,24 +45,52 @@ public class MediathekZdf extends MediathekReader {
 
   private final Phaser phaser = new Phaser();
 
+
+  
   @Override
   public void addToList() {
-    meldungStart();
-    meldungAddThread();
+    try
+    {
+        meldungStart();
+        meldungAddThread();
 
-    int days = CrawlerTool.loadLongMax() ? 300 : 20;
+        int days = CrawlerTool.loadLongMax() ? 300 : 20;
 
-    final ZDFSearchTask newTask = new ZDFSearchTask(days);
-    forkJoinPool = new ForkJoinPool(Runtime.getRuntime().availableProcessors() * 4);
-    forkJoinPool.execute(newTask);
-    Collection<VideoDTO> filmList = newTask.join();
+        final ZDFSearchTask newTask = new ZDFSearchTask(days);
+        
+        final ForkJoinWorkerThreadFactory factory = new ForkJoinWorkerThreadFactory()
+        {
+            @Override           
+            public ForkJoinWorkerThread newThread(ForkJoinPool pool)
+            {
+                final ForkJoinWorkerThread worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool);
+                worker.setName("ZDF Pool Thread-" + worker.getPoolIndex());
+                return worker;
+            }
+        };
+        
+        forkJoinPool = new ForkJoinPool(Runtime.getRuntime().availableProcessors() * 4,factory,null,false);
+        forkJoinPool.execute(newTask);
+        Collection<VideoDTO> filmList = newTask.join();
 
-    convertToDto(filmList);
-
-    //explicitely shutdown the pool
-    shutdownAndAwaitTermination(forkJoinPool, 60, TimeUnit.SECONDS);
-
-    meldungThreadUndFertig();
+        convertToDto(filmList);
+          
+          
+        try{shutdownAndAwaitTermination(forkJoinPool, 60, TimeUnit.SECONDS);}catch(Exception exc){exc.printStackTrace();}
+        
+      
+    }
+    catch(Exception exc)
+    {
+        Log.sysLog("Unexpected exception happened to thread.");
+        exc.printStackTrace();
+    }
+    finally
+    {
+         //explicitely shutdown the pool
+        
+        meldungThreadUndFertig();
+    }
   }
 
   void convertToDto(Collection<VideoDTO> filmList) {
@@ -101,7 +130,8 @@ public class MediathekZdf extends MediathekReader {
     perfPoint.collect();
   }
 
-  void shutdownAndAwaitTermination(ExecutorService pool, long delay, TimeUnit delayUnit) {
+  void shutdownAndAwaitTermination(ExecutorService pool, long delay, TimeUnit delayUnit)
+  {
     Log.sysLog("ZDF shutdown pool...");
     pool.shutdown();
     try {
@@ -112,7 +142,7 @@ public class MediathekZdf extends MediathekReader {
         }
       }
     } catch (InterruptedException ie) {
-      pool.shutdownNow();
+      try{pool.shutdownNow();}catch(Exception exc){exc.printStackTrace();}
       Thread.currentThread().interrupt();
     }
   }

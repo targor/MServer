@@ -10,9 +10,12 @@ import com.sun.jersey.api.client.WebResource;
 import com.sun.jersey.api.client.filter.GZIPContentEncodingFilter;
 import de.mediathekview.mlib.Const;
 import de.mediathekview.mlib.tool.Log;
+import java.net.SocketTimeoutException;
+import jdk.nashorn.internal.runtime.regexp.joni.Config;
 import mServer.crawler.FilmeSuchen;
 import mServer.crawler.RunSender;
 import mServer.tool.MserverDaten;
+import org.glassfish.jersey.client.ClientProperties;
 
 /**
  * jersey client of ZDF
@@ -59,6 +62,8 @@ public class ZDFClient {
 
   public ZDFClient() {
     client = Client.create();
+    client.setConnectTimeout(60000);
+    client.setReadTimeout(120000);
     client.addFilter(new GZIPContentEncodingFilter(true));
     gson = new Gson();
   }
@@ -77,34 +82,45 @@ public class ZDFClient {
             .queryParam(PROPERTY_DATE_TO, today.plusMonths(monthFuture).format(DATE_TIME_FORMAT))
             .queryParam(PROPERTY_SORT_BY, SORT_BY_DATE)
             .queryParam(PROPERTY_PAGE, Integer.toString(page));
-
+        
     return execute(webResource, ZDFClient.ZDFClientMode.SEARCH);
   }
 
-  private WebResource createResource(final String url) {
+  private WebResource createResource(final String url) 
+  {
     return client.resource(url);
   }
 
   private JsonObject execute(final WebResource webResource, final ZDFClientMode aMode) {
-    final String apiToken = loadApiToken(aMode);
+    try
+    {
+        Thread.currentThread().setName("ZDF Pool Webresource-Download");
+        final String apiToken = loadApiToken(aMode);
 
-    final ClientResponse response = webResource
-        .header(HEADER_ACCESS_CONTROL_REQUEST_HEADERS, ACCESS_CONTROL_API_AUTH)
-        .header(HEADER_ACCESS_CONTROL_REQUEST_METHOD, ACCESS_CONTROL_REQUEST_METHOD_GET)
-        .header(HEADER_API_AUTH, apiToken).header(HEADER_HOST, HOST).header(HEADER_ORIGIN, ORIGIN)
-        .header(HEADER_USER_AGENT, USER_AGENT).get(ClientResponse.class);
+        final ClientResponse response = webResource
+            .header(HEADER_ACCESS_CONTROL_REQUEST_HEADERS, ACCESS_CONTROL_API_AUTH)
+            .header(HEADER_ACCESS_CONTROL_REQUEST_METHOD, ACCESS_CONTROL_REQUEST_METHOD_GET)
+            .header(HEADER_API_AUTH, apiToken).header(HEADER_HOST, HOST).header(HEADER_ORIGIN, ORIGIN)
+            .header(HEADER_USER_AGENT, USER_AGENT).get(ClientResponse.class);
 
-    if (MserverDaten.debug) {
-      Log.sysLog("Lade Seite: " + webResource.getURI());
+        if (MserverDaten.debug) {
+          Log.sysLog("Lade Seite: " + webResource.getURI());
+        }
+
+        if (response.getStatus() == 200) {
+          return handleOk(response);
+        } else {
+          Log.errorLog(496583258,
+              "Lade Seite " + webResource.getURI() + " fehlgeschlagen: " + response.getStatus());
+          increment(RunSender.Count.FEHLER);
+          return null;
+        }
     }
-
-    if (response.getStatus() == 200) {
-      return handleOk(response);
-    } else {
-      Log.errorLog(496583258,
-          "Lade Seite " + webResource.getURI() + " fehlgeschlagen: " + response.getStatus());
-      increment(RunSender.Count.FEHLER);
-      return null;
+    catch(Exception exc)
+    {
+        Log.errorLog(496583258,"Lade Seite " + webResource.getURI() + " fehlgeschlagen: " + exc.getMessage());
+        exc.printStackTrace();
+        return null;
     }
   }
 
